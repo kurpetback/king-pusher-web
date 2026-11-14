@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>King Pusher</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #140a2e; overscroll-behavior: none;
+    font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; color: #fff; -webkit-user-select: none; user-select: none; touch-action: none; }
+  #game { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; background: #140a2e; }
+  #splash { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom);
+    background: radial-gradient(ellipse at 50% 30%, #4b2a9a 0%, #1d0f45 55%, #0c0620 100%); text-align: center; transition: opacity .35s; }
+  #splash.hide { opacity: 0; pointer-events: none; }
+  .crown { font-size: 88px; line-height: 1; filter: drop-shadow(0 6px 18px rgba(255,200,40,.55)); animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px); } }
+  h1 { margin: 0; font-size: 40px; letter-spacing: 1px; color: #ffd84a; text-shadow: 0 3px 0 #a86a00, 0 8px 24px rgba(0,0,0,.5); }
+  p.sub { margin: -10px 0 0; opacity: .75; font-size: 15px; }
+  button { appearance: none; border: 0; border-radius: 16px; padding: 16px 40px; font-size: 20px; font-weight: 800; color: #3a2400;
+    background: linear-gradient(#ffe36b, #ffb81c); box-shadow: 0 5px 0 #a86a00, 0 10px 24px rgba(0,0,0,.4); }
+  button:active { transform: translateY(3px); box-shadow: 0 2px 0 #a86a00; }
+  button[hidden], #progress[hidden] { display: none; }
+  button.play { background: linear-gradient(#7dff8a, #1fc23a); color: #053b10; box-shadow: 0 5px 0 #0c7a22, 0 10px 24px rgba(0,0,0,.4); }
+  #progress { width: min(78vw, 320px); }
+  .bar { height: 14px; border-radius: 9px; background: rgba(255,255,255,.15); overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #ffb81c, #ffe36b); transition: width .2s; }
+  #pct { margin-top: 10px; font-size: 14px; opacity: .8; }
+  #err { color: #ff8a8a; font-size: 14px; max-width: 320px; }
+</style>
+</head>
+<body>
+<canvas id="game" tabindex="-1"></canvas>
+
+<div id="splash">
+  <div class="crown">👑</div>
+  <h1>KING PUSHER</h1>
+  <p class="sub">Игра весит ~90 МБ — загрузится один раз</p>
+  <button id="load">Загрузить игру</button>
+  <div id="progress" hidden>
+    <div class="bar"><div id="fill"></div></div>
+    <div id="pct">0%</div>
+  </div>
+  <button id="play" class="play" hidden>▶ ИГРАТЬ</button>
+  <div id="err"></div>
+</div>
+
+<script>
+  const tg = window.Telegram && Telegram.WebApp;
+  const $ = id => document.getElementById(id);
+  try { if (tg) { tg.ready(); tg.expand(); tg.disableVerticalSwipes && tg.disableVerticalSwipes(); tg.setHeaderColor && tg.setHeaderColor('#1d0f45'); tg.setBackgroundColor && tg.setBackgroundColor('#140a2e'); } } catch (e) {}
+
+  function goFullscreen() {
+    try { tg && tg.expand(); } catch (e) {}
+    try { tg && tg.requestFullscreen && !tg.isFullscreen && tg.requestFullscreen(); } catch (e) {}
+    try { tg && tg.lockOrientation && tg.lockOrientation(); } catch (e) {}
+  }
+
+  const cfg = {
+    dataUrl: "Build/game.data", frameworkUrl: "Build/game.framework.js", codeUrl: "Build/game.wasm",
+    streamingAssetsUrl: "StreamingAssets", companyName: "BrainCode", productName: "Coin Pusher", productVersion: "0.1.0",
+    devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+    showBanner: (m, t) => { if (t === 'error') $('err').textContent = m.replace(/<[^>]*>/g, ''); }
+  };
+
+  let started = false;
+  $('load').onclick = () => {
+    if (started) return; started = true;
+    $('load').hidden = true; $('progress').hidden = false; $('err').textContent = '';
+    const s = document.createElement('script');
+    s.src = "Build/game.loader.js";
+    s.onerror = () => { $('err').textContent = 'Не удалось загрузить Build/game.loader.js'; started = false; $('load').hidden = false; $('progress').hidden = true; };
+    s.onload = () => {
+      createUnityInstance($('game'), cfg, p => {
+        const v = Math.round(p * 100);
+        $('fill').style.width = v + '%';
+        $('pct').textContent = v < 90 ? `Загрузка… ${v}%` : `Запуск… ${v}%`;
+      }).then(() => {
+        $('progress').hidden = true; $('play').hidden = false;
+      }).catch(e => {
+        $('err').textContent = 'Ошибка загрузки: ' + e; started = false; $('load').hidden = false; $('load').textContent = 'Повторить'; $('progress').hidden = true;
+      });
+    };
+    document.body.appendChild(s);
+  };
+  $('play').onclick = () => { goFullscreen(); $('splash').classList.add('hide'); setTimeout(() => $('splash').remove(), 400); };
+</script>
+</body>
+</html>
